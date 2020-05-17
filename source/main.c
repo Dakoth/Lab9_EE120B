@@ -12,6 +12,62 @@
 #include "simAVRHeader.h"
 #endif
 
+//////////////////////////////////
+//timer stuff 
+volatile unsigned char TimerFlag = 0; //stuff added 
+
+unsigned long _avr_timer_M = 1;
+unsigned long _avr_timer_cntcurr = 0;
+
+void TimerOn() {
+	//AVR timer/counter controller register ....
+	TCCR1B = 0x0B;
+
+	//AVR output compare register ....
+	OCR1A = 125;
+
+	//AVR timer interrupt mask register
+	TIMSK1 = 0x02;
+
+	//initialize avr counter
+	TCNT1=0;
+
+	_avr_timer_cntcurr = _avr_timer_M;
+	//TimerIRS called every _avr ... milliseconds
+	//
+	
+	//enable global interrupts
+	SREG |= 0x80; //0x80: 1000000
+}
+
+void TimerOff() {
+	TCCR1B = 0x00; //timer off
+}
+
+void TimerISR() {
+	TimerFlag = 1;
+}
+
+//TimerISR() calls this 
+ISR(TIMER1_COMPA_vect) {
+	//cpu calls when TCNT1 == OCR1
+	_avr_timer_cntcurr--;	//counts down to 0
+
+	if (_avr_timer_cntcurr == 0) {
+		TimerISR();	//calls ISR that user uses
+		_avr_timer_cntcurr = _avr_timer_M;
+
+	}
+}
+
+//Set TimerISR() to tick every M ms
+void TimerSet(unsigned long M) {
+	_avr_timer_M = M;
+	_avr_timer_cntcurr = _avr_timer_M;
+}
+
+
+
 /////////////////////////////////////////////////////
 //stuff for PWM
 void set_PWM(double frequency) {
@@ -205,12 +261,20 @@ int main(void) {
 
 	tmpA = 0x00;
 	//tmpB = 0x00;
+	
+	
+	//Timer stuff
+	TimerSet(200);
+	TimerOn();
 
     /* Insert your solution below */
     while (1) {
 	    tmpA = ~PINA;
 
 	    Tick();
+	    
+	    while(!TimerFlag) {}
+	    TimerFlag = 0;
 
     }
     return 1;
