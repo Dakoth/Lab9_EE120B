@@ -107,16 +107,41 @@ void PWM_off() {
 //STATE STUFF 
 
 
-enum States {Start, Wait, Inc, Dec, Toggle} state;
+enum States {Start, Wait, playNote, downTime, endHold} state;
 
 unsigned char tmpA;
 
-double arr[8] = {261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25};
+unsigned char i; //, j, k; 
+unsigned char x;
 
-//unsigned char tmpB;
-unsigned char i;
+//Notes
+double C4, D, E, F, G, A, B, C5;
+/* 
+double C4 = 261.63;
+double D = 293.66;
+double E = 329.63;
+double F = 349.23;
+double G = 392.00;
+double A = 440.00;
+double B = 493.88;
+double C5 = 523.25;
+*/
 
-unsigned char soundON = 1; //Acts like a bool, determines if sound is on or not 
+/*
+double notes[8] = {261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25};
+double noteLength[8] = {1, 1, 1, 1, 1, 1, 1, 1};
+double downT[8] = {0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2};
+const unsigned char lastIndex = 7;
+*/
+
+//double notes[16] = {A, E, D, C5,  B, C5, B, A,  B, C5, D, C5,  B, G, B, A };
+double notes[16] = {440, 329.63, 293.66, 523.25,  493.88, 523.25, 493.88, 440,  493.88, 523.25, 293.66, 523.25,  493.88, 392, 493.88, 440};  
+//double notes[16] = {233.08, 329.63, 293.66, 523.25,  246.94, 523.25, 246.94, 233.08,  246.94, 523.25, 293.66, 523.25,  246.94, 207.65, 246.94, 233.08};  
+
+double noteLength[16] = {1, 1, 1, 1, 1, 1, 1, 1,  1,1, 1, 1,  1, 1, 1, 1};
+double downT[16] = {1, 1, 1, 1, 1, 1, 1, 1,  1,1, 1, 1,  1, 1, 1, 1};
+const unsigned char lastIndex = 15; //Last index of the array 
+ 
 
 void Tick() {
 	switch (state) {
@@ -124,101 +149,58 @@ void Tick() {
 			//tmpB = 0;
 			state = Wait;
 			i = 0;
-			soundON = 1;
+			x = 0;
 			PWM_on();
-			set_PWM(arr[i]);
+			//set_PWM(arr[i]);
 			break;
 
 		case Wait: 
-			if ( (tmpA & 0xFF) == 0x01) { //PA0, inc
-				if (i < 7) { //If not at end of array
-					i++;
-				}
-
-				if (soundON) { //If the sound is on, set the tone
-					set_PWM(arr[i]);
-				}	
-				state = Inc;
-			}	
-			else if ( (tmpA & 0xFF) == 0x02) { //PA1, dec
-				if (i > 0) { //can't be less than 0
-					i--;
-				}
-
-				if (soundON) {
-					set_PWM(arr[i]);
-				}	
-
-				state = Dec;
-			}
-			else if ( (tmpA & 0xFF) == 0x04) { //Toggle, PA2
-				set_PWM(0); //E
-
-				if (soundON == 1) { //If the sound was on, turn off
-					soundON = 0;
-				}
-				else { //if off, turn it back on
-					soundON = 1;
-				}
-				//soundON = 0;
-				state = Toggle;
-			}
-			else if ( (tmpA & 0xFF) == 0x00) { //If no butt pressed
-				//set_PWM(0); //C
-
-				if (soundON) {
-					set_PWM(arr[i]);
-				}	
-				state = Wait;
+			if ( (tmpA & 0xFF) == 0x01) { // If button pressed 
+				state = playNote;
+				x = 0;
 			}
 			else {
-
-				if (soundON) {
-					set_PWM(arr[i]);
-				}	
 				state = Wait;
 			}
-			//else { //Else multiple buttons are pressed 
-			//	state = manyButtHold;
-			//
 			break;
 			
-		case Inc:
-			if ( (tmpA & 0xFF) == 0x01) { //PA0
-				state = Inc;
-			}/*	
-			else if ( (tmpA & 0xFF) == 0x02) { //PA1
-				state = oneButtHold;
+		case playNote:
+			if (x < noteLength[i]) { //if note not finished playng
+				state = playNote;
 			}
-			else if ( (tmpA & 0xFF) == 0x04) { //PA2
-				state = oneButtHold;
-			}*/
-			else if ( (tmpA & 0xFF) == 0x00) { //If no butt pressed
-				//set_PWM(0); //C
-				state = Wait;
-			}/*
-			else { //Else multiple buttons are pressed 
-				state = manyButtHold;
-			}*/
-			break;
-
-
-		case Dec:
-			if ( (tmpA & 0xFF) == 0x00) { //If buttons released
-				//set_PWM(0); //C
-				state = Wait;
-			}
-			else { //Else, buttons must be on, so stay here
-				state = Dec;
+			else if ( x >= noteLength[i]) { //when note finished
+				x = 0;
+				state = downTime; 
 			}
 			break;
 
-		case Toggle:
-			if ( (tmpA & 0xFF) == 0x04) {
-				state = Toggle;
+		case downTime:
+			if ( x < downT[i]) { //when down time not over
+				state = downTime;
+			}
+			else if ( x >= downT[i] && (i < lastIndex) ) { //when haven't reached end of array + downtime over
+				i++;
+				state = playNote;
+			}
+			//might need to change tmpA condition a bit; reached end of array
+			else if (( x >= downT[i]) && (i >= lastIndex) && (tmpA == 0)) {
+				i = 0;
+				state = Wait;
+			}
+			//Goes to endHold
+			else if (( x >= downT[i]) && (i >= lastIndex) && (tmpA == 1)) {
+				i = 0;
+				state = endHold;
+			}
+			break;
+
+		case endHold:
+			if ( (tmpA & 0xFF) == 0x01) {
+				state = endHold;
 			}
 			else {
 				state = Wait;
+				i = 0;
 			}
 			break;
 
@@ -230,22 +212,24 @@ void Tick() {
 
 	switch(state) { //state actions
 		case Wait:
-			//set_PWM(0);
+			set_PWM(0);
 			break;
 
 
-		case Inc:
+		case playNote:
+			x++;
+			set_PWM(notes[i]);
 			break;
 
-		case Dec:
-			//set_PWM(0);
+		case downTime:
+			x++;
+			set_PWM(0);
 			break;
 
-		case Toggle:
+		case endHold:
 			break;
 
-
-		default: 
+		default:
 			break;
 	}
 }
@@ -265,8 +249,21 @@ int main(void) {
 	
 	
 	//Timer stuff
-	TimerSet(100);
+	TimerSet(150); //500 ms, or .5 of a second 
 	TimerOn();
+
+
+ 	/*
+	C4 = 261.63;
+	D = 293.66;
+	E = 329.63;
+	F = 349.23;
+	G = 392.00;
+	A = 440.00;
+	B = 493.88;
+	C5 = 523.25;
+	*/
+
 
     /* Insert your solution below */
     while (1) {
