@@ -50,90 +50,143 @@ void PWM_off() {
 //STATE STUFF 
 
 
-enum States {Start, Wait, oneButtHold, manyButtHold} state;
+enum States {Start, Wait, Inc, Dec, Toggle} state;
 
 unsigned char tmpA;
 
+double arr[8] = {261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25};
+
 //unsigned char tmpB;
+unsigned char i;
+
+unsigned char soundON = 1; //Acts like a bool, determines if sound is on or not 
 
 void Tick() {
 	switch (state) {
 		case Start:
 			//tmpB = 0;
 			state = Wait;
+			i = 0;
+			soundON = 1;
 			PWM_on();
+			set_PWM(arr[i]);
 			break;
 
 		case Wait: 
-			if ( (tmpA & 0xFF) == 0x01) { //PA0
-				set_PWM(261.63); //C
-				state = oneButtHold;
+			if ( (tmpA & 0xFF) == 0x01) { //PA0, inc
+				if (i < 7) { //If not at end of array
+					i++;
+				}
+
+				if (soundON) { //If the sound is on, set the tone
+					set_PWM(arr[i]);
+				}	
+				state = Inc;
 			}	
-			else if ( (tmpA & 0xFF) == 0x02) { //PA1
-				set_PWM(293.66); //D
-				state = oneButtHold;
+			else if ( (tmpA & 0xFF) == 0x02) { //PA1, dec
+				if (i > 0) { //can't be less than 0
+					i--;
+				}
+
+				if (soundON) {
+					set_PWM(arr[i]);
+				}	
+
+				state = Dec;
 			}
-			else if ( (tmpA & 0xFF) == 0x04) { //PA2
-				set_PWM(329.63); //E
-				state = oneButtHold;
+			else if ( (tmpA & 0xFF) == 0x04) { //Toggle, PA2
+				set_PWM(0); //E
+
+				if (soundON == 1) { //If the sound was on, turn off
+					soundON = 0;
+				}
+				else { //if off, turn it back on
+					soundON = 1;
+				}
+				//soundON = 0;
+				state = Toggle;
 			}
 			else if ( (tmpA & 0xFF) == 0x00) { //If no butt pressed
-				set_PWM(0); //C
+				//set_PWM(0); //C
+
+				if (soundON) {
+					set_PWM(arr[i]);
+				}	
 				state = Wait;
 			}
-			else { //Else multiple buttons are pressed 
-				state = manyButtHold;
+			else {
+
+				if (soundON) {
+					set_PWM(arr[i]);
+				}	
+				state = Wait;
 			}
+			//else { //Else multiple buttons are pressed 
+			//	state = manyButtHold;
+			//
 			break;
 			
-		case oneButtHold:
+		case Inc:
 			if ( (tmpA & 0xFF) == 0x01) { //PA0
-				state = oneButtHold;
-			}	
+				state = Inc;
+			}/*	
 			else if ( (tmpA & 0xFF) == 0x02) { //PA1
 				state = oneButtHold;
 			}
 			else if ( (tmpA & 0xFF) == 0x04) { //PA2
 				state = oneButtHold;
-			}
+			}*/
 			else if ( (tmpA & 0xFF) == 0x00) { //If no butt pressed
-				set_PWM(0); //C
+				//set_PWM(0); //C
 				state = Wait;
-			}
+			}/*
 			else { //Else multiple buttons are pressed 
 				state = manyButtHold;
-			}
+			}*/
 			break;
 
 
-		case manyButtHold:
+		case Dec:
 			if ( (tmpA & 0xFF) == 0x00) { //If buttons released
-				set_PWM(0); //C
+				//set_PWM(0); //C
 				state = Wait;
 			}
 			else { //Else, buttons must be on, so stay here
-				state = manyButtHold;
+				state = Dec;
+			}
+			break;
+
+		case Toggle:
+			if ( (tmpA & 0xFF) == 0x04) {
+				state = Toggle;
+			}
+			else {
+				state = Wait;
 			}
 			break;
 
 		default:
 			state = Wait;
-			set_PWM(0);
+			//set_PWM(0);
 			break;
 	}
 
 	switch(state) { //state actions
 		case Wait:
-			set_PWM(0);
+			//set_PWM(0);
 			break;
 
 
-		case oneButtHold:
+		case Inc:
 			break;
 
-		case manyButtHold:
-			set_PWM(0);
+		case Dec:
+			//set_PWM(0);
 			break;
+
+		case Toggle:
+			break;
+
 
 		default: 
 			break;
